@@ -12,7 +12,7 @@ from functools import partial
 import torch.nn as nn
 
 # ----- Configurable Paths -----
-MODEL_LOAD_PATH = r"D:\fine-tuning-project-local\sentiment_model\yelp_model"
+MODEL_LOAD_PATH = r"D:\fine-tuning-project-local\sentiment_model\original_model"
 EAP_DATA_PATH = "../data/yelp_corrupted_10.csv"
 
 # ----- Reload Model and Config -----
@@ -34,8 +34,8 @@ classifier = GPT2Classifier(d_model=model.cfg.d_model)
 classifier.load_state_dict(torch.load(os.path.join(MODEL_LOAD_PATH, "classifier.pt")))
 
 # Optional: Load optimizer
-optimizer = torch.optim.AdamW(list(model.parameters()) + list(classifier.parameters()), lr=1e-4)
-optimizer.load_state_dict(torch.load(os.path.join(MODEL_LOAD_PATH, "optimizer.pt")))
+# optimizer = torch.optim.AdamW(list(model.parameters()) + list(classifier.parameters()), lr=1e-4)
+# optimizer.load_state_dict(torch.load(os.path.join(MODEL_LOAD_PATH, "optimizer.pt")))
 device = model.cfg.device
 print(device)
 model.to(device)
@@ -51,7 +51,6 @@ dataset = batch_dataset(df)
 
 
 import torch
-import torch.nn.functional as F
 
 def predict_sentiment(text, model, classifier, tokenizer, max_length=64, threshold=0.5):
     # Tokenize input
@@ -77,9 +76,8 @@ def predict_sentiment(text, model, classifier, tokenizer, max_length=64, thresho
 
     return predicted_label, prob
 
-
-l=predict_sentiment("I am good", model, classifier, model.tokenizer, max_length=64, threshold=0.5)
-print("labellllll ",l)
+# l=predict_sentiment("I am good", model, classifier, model.tokenizer, max_length=64, threshold=0.5)
+# print("labellllll ",l)
 
 # ----- Metric Function -----
 def calculate_logit_diff(logits, label, mean=False, loss=False):
@@ -101,26 +99,19 @@ for param in model.parameters():
     param.requires_grad = True
 
 
-attribute.attribute(model, graph, dataset, metric)
+attribute.attribute(model, graph, dataset,metric)
 
 # ----- Output Scores -----
 scores = graph.scores(absolute=True)
 print("Graph Scores:", scores)
 
-# 获取所有边的分数和对应的边
 edges_with_scores = [(edge, edge.score) for edge in graph.edges.values() if edge.score is not None]
 
-# 如果没有分数，抛出错误
-if not edges_with_scores:
-    raise ValueError("没有边的分数可供选择，请先运行 EAP 计算分数。")
-
-# 根据绝对值排序（如果需要）
+# sort based on absolute score
 edges_with_scores.sort(key=lambda x: abs(x[1]), reverse=True)
 
-# 选择 top-k 边（例如 k=5）
 k = 5
 top_k_edges = edges_with_scores[:k]
 
-# 打印 top-k 边
 for edge, score in top_k_edges:
     print(f"Edge: {edge.name}, Score: {score}")

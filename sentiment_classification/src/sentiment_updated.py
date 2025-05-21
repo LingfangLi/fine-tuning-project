@@ -5,6 +5,7 @@ from transformers import AutoTokenizer
 from transformer_lens import HookedTransformer
 import torch.nn.functional as F
 from datasets import load_dataset
+import os
 # Load TransformerLens GPT2-small
 model = HookedTransformer.from_pretrained("gpt2-small", device="cpu")  # or "cuda"
 model.cfg.use_attn_in = True
@@ -72,6 +73,16 @@ class GPT2Classifier(nn.Module):
         return self.linear(final_hidden).squeeze(-1)
 
 classifier = GPT2Classifier(d_model=model.cfg.d_model)
+
+original_model_path = r"D:\fine-tuning-project-local\sentiment_model\original_model"
+
+if not os.path.exists(original_model_path):
+    os.makedirs(original_model_path)
+
+torch.save(model.state_dict(), os.path.join(original_model_path, "gpt2_transformerlens.pt"))
+torch.save(classifier.state_dict(), os.path.join(original_model_path, "classifier.pt"))
+
+print(f"pretrained model has been saved to {original_model_path}")
 
 # Optimizer and loss
 optimizer = torch.optim.AdamW(list(model.parameters()) + list(classifier.parameters()), lr=1e-4)

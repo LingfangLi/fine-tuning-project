@@ -7,7 +7,7 @@ from transformer_lens import HookedTransformer
 from tqdm import tqdm
 from einops import einsum
 import os
-MODEL_LOAD_PATH=r"D:\fine-tuning-project-local\sentiment_model\yelp_model"
+MODEL_LOAD_PATH=r"D:\fine-tuning-project-local\sentiment_model\original_model"
 from .graph import Graph, InputNode, LogitNode, AttentionNode, MLPNode
 
 import torch
