@@ -7,13 +7,12 @@ from transformers import GPT2Tokenizer
 from transformer_lens import HookedTransformer, HookedTransformerConfig
 import pandas as pd
 # ---------------- Config ----------------
-TRAIN_DATA_PATH = "../yelp_train.csv"
+TRAIN_DATA_PATH = "yelp_polarity" # Or "stanfordnlp/imdb".Load from huggingface
 MODEL_SAVE_PATH = "../transformerlens_yelp_model"
 BATCH_SIZE = 2
 NUM_EPOCHS = 3
 LEARNING_RATE = 5e-5
 MAX_LENGTH = 512
-
 # ---------------- Utils ----------------
 def make_prompt_and_target(text, label):
     return f"Review: {text}\nSentiment:", f"{label}"
@@ -23,14 +22,14 @@ class SentimentDataset(Dataset):
         self.data = []
         self.labels = []
         for sample in dataset:
-            label = 1 if sample["label"] == "pos" else 0
-            prompt, target = make_prompt_and_target(sample["text"], label)
+            #label = 1 if sample["label"] == "pos" else 0
+            prompt, target = make_prompt_and_target(sample["text"], sample["label"])
             full = prompt + " " + target
             input_ids = tokenizer(full, padding="max_length", truncation=True, max_length=MAX_LENGTH, return_tensors="pt")["input_ids"][0]
             prompt_ids = tokenizer(prompt, padding="max_length", truncation=True, max_length=MAX_LENGTH, return_tensors="pt")["input_ids"][0]
             loss_mask = (prompt_ids == tokenizer.pad_token_id).long()
             self.data.append((input_ids, loss_mask))
-            self.labels.append(label)
+            self.labels.append(sample["label"])
 
     def __len__(self):
         return len(self.data)
@@ -64,7 +63,9 @@ def train_and_save_model(train_data_path, save_path):
     model.train()
 
     print("Loading dataset...")
-    raw_data = load_dataset("csv", data_files=train_data_path)["train"]
+    #raw_data = load_dataset("csv", data_files=train_data_path)["train"]
+    raw_data = load_dataset('yelp_polarity')['train'].select(range(5))
+    raw_data = raw_data.to_pandas().to_dict("records")
     dataset = SentimentDataset(raw_data, tokenizer)
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
