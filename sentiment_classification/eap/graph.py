@@ -120,7 +120,7 @@ class Edge:
 class Graph:
     nodes: Dict[str, Node]
     edges: Dict[str, Edge]
-    n_forward: int 
+    n_forward: int
     n_backward: int
     cfg: HookedTransformerConfig
 
@@ -151,7 +151,7 @@ class Graph:
             return slice(i, i + self.cfg['n_heads']) if attn_slice else i + node.head
         else:
             raise ValueError(f"Invalid node: {node} of type {type(node)}")
-        
+
 
     def backward_index(self, node:Node, qkv=None, attn_slice=True):
         if isinstance(node, InputNode):
@@ -176,22 +176,22 @@ class Graph:
 
     def count_included_edges(self):
         return sum(edge.in_graph for edge in self.edges.values())
-    
+
     def count_included_nodes(self):
         return sum(node.in_graph for node in self.nodes.values())
 
     def apply_threshold(self, threshold: float, absolute: bool):
         threshold = float(threshold)
         for node in self.nodes.values():
-            node.in_graph = True 
-            
+            node.in_graph = True
+
         for edge in self.edges.values():
             edge.in_graph = abs(edge.score) >= threshold if absolute else edge.score >= threshold
 
     def apply_greedy(self, n_edges, reset=True, absolute: bool=False):
         if reset:
             for node in self.nodes.values():
-                node.in_graph = False 
+                node.in_graph = False
             for edge in self.edges.values():
                 edge.in_graph = False
             self.nodes['logits'].in_graph = True
@@ -212,102 +212,13 @@ class Graph:
                 parent_parent_edges = sorted([parent_edge for parent_edge in parent.parent_edges], key = lambda edge: abs_id(edge.score), reverse=True)
                 edges = heapq.merge(edges, parent_parent_edges, key = lambda edge: abs_id(edge.score), reverse=True)
 
-    def apply_topn(self, n: int, absolute: bool = True, level: Literal['edge', 'node', 'neuron'] = 'edge',
-                   reset: bool = True, prune: bool = True):
-        """Sets the graph to contain only the top-n components. The components are specified by the level parameter, which can be 'edge','node', or 'neuron'. If 'node', the top-n nodes are selected based on their scores, and all outgoing edges to nodes in the graph are true. If 'edge', the top-n edges are selected based on their scores. If 'neuron', the top-n neurons are selected based on their scores, and all outgoing edges to nodes with neurons in the graph are true.
-
-        Args:
-            n (int): number of edges/nodes/neurons to take
-            absolute (bool): whether to apply topn based on the absolute value of the scores
-            reset (bool): resets the graph, setting everything to zero, before applying topn. Only if reset=True will corresponding edges be added after neuron and node topn
-            level (str, optional): level at which to apply topn. Defaults to 'edge'.
-            prune (bool): whether to prune the graph after applying topn
-        """
-        if reset:
-            self.reset()
-
-        if level == 'neuron':
-            scored_neurons = ~torch.isnan(self.neurons_scores)
-            n_scored_neurons = scored_neurons.sum()
-            assert n <= n_scored_neurons, f"Requested n ({n}) is greater than the number of scored neurons ({n_scored_neurons})"
-            neuron_score_copy = self.neurons_scores.clone()
-            if absolute:
-                neuron_score_copy = torch.abs(neuron_score_copy)
-
-            neuron_score_copy[~scored_neurons] = -torch.inf
-            sorted_neurons = torch.argsort(neuron_score_copy.view(-1), descending=True)
-
-            # set the topn neurons to be in the graph
-            self.neurons_in_graph.view(-1)[sorted_neurons[:n]] = True
-            # set those outside the topn not to be in the graph
-            self.neurons_in_graph.view(-1)[sorted_neurons[n:]] = False
-            # unscored neurons must also be re-added to the graph
-            self.neurons_in_graph.view(-1)[~scored_neurons.view(-1)] = True
-            # remove any nodes with no neurons in the graph
-
-            if reset:
-                # if we've reset the graph (everything is empty), add in the nodes that are on
-                # and activate their outgoing edges
-                self.nodes_in_graph += self.neurons_in_graph.any(dim=1)
-                self.in_graph += self.nodes_in_graph.view(-1, 1)
-
-        elif level == 'node':
-            scored_nodes = ~torch.isnan(self.nodes_scores)
-            n_scored_nodes = scored_nodes.sum()
-            assert n <= n_scored_nodes, f"Requested n ({n}) is greater than the number of scored nodes ({n_scored_nodes})"
-
-            node_score_copy = self.nodes_scores.clone()
-            if absolute:
-                node_score_copy = torch.abs(node_score_copy)
-
-            node_score_copy[~scored_nodes] = -torch.inf
-            sorted_nodes = torch.argsort(node_score_copy.view(-1), descending=True)
-
-            # set the topn neurons to be in the graph
-            self.nodes_in_graph.view(-1)[sorted_nodes[:n]] = True
-            # set those outside the topn not to be in the graph
-            self.nodes_in_graph.view(-1)[sorted_nodes[n:]] = False
-            # unscored nodes must also be re-added to the graph
-            self.nodes_in_graph.view(-1)[~scored_nodes.view(-1)] = True
-
-            if reset:
-                # if we've reset the graph (everything is empty), add in the nodes that are on
-                # and activate their outgoing edges
-                self.in_graph += self.nodes_in_graph.view(-1, 1)
-
-        # get top-n edges
-        elif level == 'edge':
-            assert n <= self.real_edge_mask.sum(), f"Requested n ({n}) is greater than the number of edges ({self.real_edge_mask.sum()})"
-
-            edge_scores = self.scores.clone()
-            if absolute:
-                edge_scores = torch.abs(edge_scores)
-
-            # masking out the edges that are not real
-            edge_scores[~self.real_edge_mask] = -torch.inf
-
-            sorted_edges = torch.argsort(edge_scores.view(-1), descending=True)
-            self.in_graph.view(-1)[sorted_edges[:n]] = True
-            self.in_graph.view(-1)[sorted_edges[n:]] = False
-            if reset:
-                nodes_with_outgoing = self.in_graph.any(dim=1)
-                nodes_with_ingoing = einsum(self.in_graph.any(dim=0).float(), self.forward_to_backward.float(),
-                                            'backward, forward backward -> forward') > 0
-                nodes_with_ingoing[0] = True
-                self.nodes_in_graph += nodes_with_outgoing & nodes_with_ingoing
-
-        else:
-            raise ValueError(f"Invalid level: {level}")
-
-        if prune:
-            self.prune()
     def prune_dead_nodes(self, prune_childless=True, prune_parentless=True):
         self.nodes['logits'].in_graph = any(parent_edge.in_graph for parent_edge in self.nodes['logits'].parent_edges)
 
         for node in reversed(self.nodes.values()):
             if isinstance(node, LogitNode):
-                continue 
-            
+                continue
+
             if any(child_edge.in_graph for child_edge in node.child_edges) :
                 node.in_graph = True
             else:
@@ -315,16 +226,16 @@ class Graph:
                     node.in_graph = False
                     for parent_edge in node.parent_edges:
                         parent_edge.in_graph = False
-                else: 
+                else:
                     if any(child_edge.in_graph for child_edge in node.child_edges):
-                        node.in_graph = True 
+                        node.in_graph = True
                     else:
                         node.in_graph = False
 
         if prune_parentless:
             for node in self.nodes.values():
                 if not isinstance(node, InputNode) and node.in_graph and not any(parent_edge.in_graph for parent_edge in node.parent_edges):
-                    node.in_graph = False 
+                    node.in_graph = False
                     for child_edge in node.child_edges:
                         child_edge.in_graph = False
 
@@ -340,7 +251,7 @@ class Graph:
             graph.cfg = {'n_layers': cfg.n_layers, 'n_heads': cfg.n_heads, 'parallel_attn_mlp':cfg.parallel_attn_mlp}
         else:
             graph.cfg = model_or_config
-        
+
         input_node = InputNode()
         graph.nodes[input_node.name] = input_node
         residual_stream = [input_node]
@@ -348,36 +259,36 @@ class Graph:
         for layer in range(graph.cfg['n_layers']):
             attn_nodes = [AttentionNode(layer, head) for head in range(graph.cfg['n_heads'])]
             mlp_node = MLPNode(layer)
-            
-            for attn_node in attn_nodes: 
-                graph.nodes[attn_node.name] = attn_node 
-            graph.nodes[mlp_node.name] = mlp_node     
-                                    
+
+            for attn_node in attn_nodes:
+                graph.nodes[attn_node.name] = attn_node
+            graph.nodes[mlp_node.name] = mlp_node
+
             if graph.cfg['parallel_attn_mlp']:
                 for node in residual_stream:
-                    for attn_node in attn_nodes:          
-                        for letter in 'qkv':           
+                    for attn_node in attn_nodes:
+                        for letter in 'qkv':
                             graph.add_edge(node, attn_node, qkv=letter)
                     graph.add_edge(node, mlp_node)
-                
+
                 residual_stream += attn_nodes
                 residual_stream.append(mlp_node)
 
             else:
                 for node in residual_stream:
-                    for attn_node in attn_nodes:     
-                        for letter in 'qkv':           
+                    for attn_node in attn_nodes:
+                        for letter in 'qkv':
                             graph.add_edge(node, attn_node, qkv=letter)
                 residual_stream += attn_nodes
 
                 for node in residual_stream:
                     graph.add_edge(node, mlp_node)
                 residual_stream.append(mlp_node)
-                        
+
         logit_node = LogitNode(graph.cfg['n_layers'])
         for node in residual_stream:
             graph.add_edge(node, logit_node)
-            
+
         graph.nodes[logit_node.name] = logit_node
 
         graph.n_forward = 1 + graph.cfg['n_layers'] * (graph.cfg['n_heads'] + 1)
@@ -399,22 +310,22 @@ class Graph:
         g = Graph.from_model(d['cfg'])
         for name, in_graph in d['nodes'].items():
             g.nodes[name].in_graph = in_graph
-        
+
         for name, info in d['edges'].items():
             g.edges[name].score = info['score']
             g.edges[name].in_graph = info['in_graph']
 
         return g
-    
+
     def __eq__(self, other):
         keys_equal = (set(self.nodes.keys()) == set(other.nodes.keys())) and (set(self.edges.keys()) == set(other.edges.keys()))
         if not keys_equal:
             return False
-        
+
         for name, node in self.nodes.items():
             if node.in_graph != other.nodes[name].in_graph:
-                return False 
-            
+                return False
+
         for name, edge in self.edges.items():
             if (edge.in_graph != other.edges[name].in_graph) or not np.allclose(edge.score, other.edges[name].score):
                 return False
@@ -439,11 +350,11 @@ class Graph:
 
         for node in self.nodes.values():
             if node.in_graph:
-                g.add_node(node.name, 
-                        fillcolor=colors[node.name], 
-                        color="black", 
+                g.add_node(node.name,
+                        fillcolor=colors[node.name],
+                        color="black",
                         style="filled, rounded",
-                        shape="box", 
+                        shape="box",
                         fontname="Helvetica",
                         )
 

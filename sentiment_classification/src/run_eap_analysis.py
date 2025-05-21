@@ -12,7 +12,7 @@ from functools import partial
 import torch.nn as nn
 
 # ----- Configurable Paths -----
-MODEL_LOAD_PATH = "../sentiment_model/yelp_model"
+MODEL_LOAD_PATH = r"D:\fine-tuning-project-local\sentiment_model\yelp_model"
 EAP_DATA_PATH = "../data/yelp_corrupted_10.csv"
 
 # ----- Reload Model and Config -----
@@ -107,4 +107,20 @@ attribute.attribute(model, graph, dataset, metric)
 scores = graph.scores(absolute=True)
 print("Graph Scores:", scores)
 
-graph.apply_topn(5, absolute=True)
+# 获取所有边的分数和对应的边
+edges_with_scores = [(edge, edge.score) for edge in graph.edges.values() if edge.score is not None]
+
+# 如果没有分数，抛出错误
+if not edges_with_scores:
+    raise ValueError("没有边的分数可供选择，请先运行 EAP 计算分数。")
+
+# 根据绝对值排序（如果需要）
+edges_with_scores.sort(key=lambda x: abs(x[1]), reverse=True)
+
+# 选择 top-k 边（例如 k=5）
+k = 5
+top_k_edges = edges_with_scores[:k]
+
+# 打印 top-k 边
+for edge, score in top_k_edges:
+    print(f"Edge: {edge.name}, Score: {score}")
