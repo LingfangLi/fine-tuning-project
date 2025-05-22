@@ -111,6 +111,32 @@ def compare_attention_changes(pre_patterns, fine_patterns, str_tokens):
         print(
             f"Layer {change['layer']} Head {change['head']}: Attention from '{change['src_token']}' to '{change['dst_token']}' changed from {change['pre_value']:.4f} to {change['fine_value']:.4f}, difference = {change['diff_value']:.4f}")
 
+import re
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+def draw_attention_matrix_with_labels(attn_matrix, tokens, layer, head, prefix):
+    fig, ax = plt.subplots(figsize=(len(tokens), len(tokens)))
+    im = ax.imshow(attn_matrix, cmap="viridis")
+
+    for i in range(len(tokens)):
+        for j in range(len(tokens)):
+            ax.text(j, i, f"{tokens[i]}→{tokens[j]}", ha='center', va='center',
+                    fontsize=6, color="white", rotation=45)
+
+    ax.set_xticks(np.arange(len(tokens)))
+    ax.set_yticks(np.arange(len(tokens)))
+    ax.set_xticklabels(tokens, rotation=90)
+    ax.set_yticklabels(tokens)
+    ax.set_title(f"{prefix} - Layer {layer} Head {head}")
+    plt.tight_layout()
+
+    # Save and upload
+    img_path = f"{prefix}_layer{layer}_head{head}.png"
+    plt.savefig(img_path)
+    plt.close()
+    wandb.log({f"{prefix}_layer{layer}_head{head}_matrix": wandb.Image(img_path)})
 
 # Enhanced comparison routine
 def enhanced_comparison(pre_model, fine_model, test_sentences):
@@ -142,10 +168,6 @@ def enhanced_comparison(pre_model, fine_model, test_sentences):
             )
 
             html_content = str(pre_vis)
-            html_content = html_content.replace(
-                '</head>',
-                '<style>.cv-token-label { font-size: 12px; white-space: nowrap; overflow: visible; }</style></head>'
-            )
             # pre_html_path = f"pretrained_attention_layer_{layer}_sentence_{sentence_idx + 1}.html"
             # with open(pre_html_path, "w") as f:
             #     f.write(str(pre_vis))
@@ -160,15 +182,11 @@ def enhanced_comparison(pre_model, fine_model, test_sentences):
                 tokens=fine_str_tokens,
                 attention=fine_patterns[layer],
             )
-            # fine_html_path = f"finetuned_attention_layer_{layer}_sentence_{sentence_idx + 1}.html"
-            # with open(fine_html_path, "w") as f:
-            #     f.write(str(fine_vis))
-            # print(f"Finetuned attention pattern saved as: {fine_html_path}")
+            fine_html_path = f"finetuned_attention_layer_{layer}_sentence_{sentence_idx + 1}.html"
+            with open(fine_html_path, "w") as f:
+                f.write(str(fine_vis))
+            print(f"Finetuned attention pattern saved as: {fine_html_path}")
             html_content = str(fine_vis)
-            html_content = html_content.replace(
-                '</head>',
-                '<style>.cv-token-label { font-size: 12px; white-space: nowrap; overflow: visible; }</style></head>'
-            )
 
             try:
                 wandb.log({f"finetuned_layer_{layer}_sentence_{sentence_idx + 1}": wandb.Html(str(html_content))})
