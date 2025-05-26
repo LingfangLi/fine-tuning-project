@@ -12,8 +12,8 @@ MODEL_SAVE_PATH = "../transformerlens_yelp_model"
 BATCH_SIZE = 2
 NUM_EPOCHS = 3
 LEARNING_RATE = 5e-5
-MAX_LENGTH = 512
-NUM_SAMPLE=5000
+MAX_LENGTH = 100
+NUM_SAMPLE=1000
 # ---------------- Utils ----------------
 def make_prompt_and_target(text, label):
     return f"Review: {text}\nSentiment:", f"{label}"
@@ -25,11 +25,11 @@ class SentimentDataset(Dataset):
         for sample in dataset:
             #label = 1 if sample["label"] == "pos" else 0
             prompt, target = make_prompt_and_target(sample["text"], sample["label"])
-            full = prompt + " " + target
+            full = prompt 
             input_ids = tokenizer(full, padding="max_length", truncation=True, max_length=MAX_LENGTH, return_tensors="pt")["input_ids"][0]
-            prompt_ids = tokenizer(prompt, padding="max_length", truncation=True, max_length=MAX_LENGTH, return_tensors="pt")["input_ids"][0]
+            prompt_ids = tokenizer(str(sample["label"]), padding="max_length", truncation=True, max_length=MAX_LENGTH, return_tensors="pt")["input_ids"][0]
             loss_mask = (prompt_ids == tokenizer.pad_token_id).long()
-            self.data.append((input_ids, loss_mask))
+            self.data.append((input_ids, prompt_ids))
             self.labels.append(sample["label"])
 
     def __len__(self):
@@ -76,18 +76,13 @@ def train_and_save_model(train_data_path, save_path):
 
     for epoch in range(NUM_EPOCHS):
         total_loss = 0
-        for input_ids, loss_mask in dataloader:
-            input_ids, loss_mask = input_ids.to(device), loss_mask.to(device)
+        for input_ids, label_id in dataloader:
+            input_ids, label_id = input_ids.to(device), label_id.to(device)
             with torch.cuda.amp.autocast():
                 logits = model(input_ids)
-                shift_logits = logits[:, :-1, :]
-                shift_labels = input_ids[:, 1:]
-                shift_mask = loss_mask[:, 1:]
-
                 loss_fct = torch.nn.CrossEntropyLoss(reduction="none")
-                loss = loss_fct(shift_logits.reshape(-1, shift_logits.size(-1)), shift_labels.reshape(-1))
-                masked_loss = loss * shift_mask.reshape(-1)
-                final_loss = masked_loss.sum() / shift_mask.sum()
+                loss = loss_fct(logits.reshape(-1, logits.size(-1)), label_id.reshape(-1))
+                final_loss = loss.sum() 
 
             optimizer.zero_grad()
             scaler.scale(final_loss).backward()
