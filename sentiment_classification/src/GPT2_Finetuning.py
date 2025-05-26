@@ -77,7 +77,7 @@ def train_and_save_model(train_data_path, save_path):
     for epoch in range(NUM_EPOCHS):
         total_loss = 0
         for input_ids, label_id in dataloader:
-            input_ids, loss_mask = input_ids.to(device), loss_mask.to(device)
+            input_ids, label_id = input_ids.to(device), label_id.to(device)
             with torch.cuda.amp.autocast():
                 logits = model(input_ids)
                 loss_fct = torch.nn.CrossEntropyLoss(reduction="none")
