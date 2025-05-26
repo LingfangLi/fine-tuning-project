@@ -116,33 +116,45 @@ import re
 import matplotlib.pyplot as plt
 import numpy as np
 
-def draw_attention_matrix_with_labels(attn_matrix, tokens, layer, head, prefix):
-    fig, ax = plt.subplots(figsize=(len(tokens), len(tokens)))
-    im = ax.imshow(attn_matrix, cmap="viridis")
+def draw_layer_heads_matrix_grid(attn_patterns, tokens, layer, prefix):
+    """
+    将一个 Layer 的所有 heads attention matrix 显示在一张图中（3x4 网格）。
+    """
+    n_heads = attn_patterns.shape[0]
+    fig, axes = plt.subplots(3, 4, figsize=(16, 12))  # 3行4列
+    axes = axes.flatten()
 
-    for i in range(len(tokens)):
-        for j in range(len(tokens)):
-            ax.text(j, i, f"{tokens[i]}→{tokens[j]}", ha='center', va='center',
-                    fontsize=6, color="white", rotation=45)
+    for head in range(n_heads):
+        ax = axes[head]
+        matrix = attn_patterns[head].cpu().numpy()
+        im = ax.imshow(matrix, cmap="viridis")
 
-    ax.set_xticks(np.arange(len(tokens)))
-    ax.set_yticks(np.arange(len(tokens)))
-    ax.set_xticklabels(tokens, rotation=90)
-    ax.set_yticklabels(tokens)
-    ax.set_title(f"{prefix} - Layer {layer} Head {head}")
-    plt.tight_layout()
+        ax.set_xticks(np.arange(len(tokens)))
+        ax.set_yticks(np.arange(len(tokens)))
+        ax.set_xticklabels(tokens, rotation=90, fontsize=6)
+        ax.set_yticklabels(tokens, fontsize=6)
+        ax.set_title(f"Head {head}", fontsize=10)
 
-    # Save and upload
-    img_path = f"{prefix}_layer{layer}_head{head}.png"
+    # 去掉多余 subplot（防止非12头情况报错）
+    for i in range(n_heads, len(axes)):
+        fig.delaxes(axes[i])
+
+    fig.suptitle(f"{prefix} - Layer {layer} All Heads", fontsize=14)
+    plt.tight_layout(rect=[0, 0, 1, 0.96])  # 给标题留空间
+    img_path = f"{prefix}_layer{layer}_all_heads.png"
     plt.savefig(img_path)
     plt.close()
-    wandb.log({f"{prefix}_layer{layer}_head{head}_matrix": wandb.Image(img_path)})
+
+    try:
+        wandb.log({f"{prefix}_layer{layer}_all_heads": wandb.Image(img_path)})
+    except:
+        print(f"Skipped wandb logging for {prefix} layer {layer} all heads.")
 
 # Enhanced comparison routine
 def enhanced_comparison(pre_model, fine_model, test_sentences):
     """Compare pre- and post-finetuning attention patterns on a set of test sentences."""
     try:
-        wandb.init(project="attention-pattern-changes", name="finetuning-comparison")
+        wandb.init(project="attention-pattern-changes", name="twitter-finetuning-comparison")
     except Exception as e:
         print(f"Could not initialize wandb: {e}")
         print("Continuing without logging to wandb.")
@@ -161,37 +173,49 @@ def enhanced_comparison(pre_model, fine_model, test_sentences):
         n_layers = pre_model.cfg.n_layers
         for layer in range(n_layers):
             print(f"\n=== Visualizing Layer {layer} (Sentence {sentence_idx + 1}) ===")
-
-            pre_vis = cv.attention.attention_patterns(
+            draw_layer_heads_matrix_grid(
+                attn_patterns=pre_patterns[layer],
                 tokens=pre_str_tokens,
-                attention=pre_patterns[layer],
+                layer=layer,
+                prefix="pretrained"
             )
 
-            html_content = str(pre_vis)
+            draw_layer_heads_matrix_grid(
+                attn_patterns=fine_patterns[layer],
+                tokens=fine_str_tokens,
+                layer=layer,
+                prefix="finetuned"
+            )
+            # pre_vis = cv.attention.attention_patterns(
+            #     tokens=pre_str_tokens,
+            #     attention=pre_patterns[layer],
+            # )
+            #
+            # html_content = str(pre_vis)
             # pre_html_path = f"pretrained_attention_layer_{layer}_sentence_{sentence_idx + 1}.html"
             # with open(pre_html_path, "w") as f:
             #     f.write(str(pre_vis))
             # print(f"Pretrained attention pattern saved as: {pre_html_path}")
+            #
+            # try:
+            #     wandb.log({f"pretrained_layer_{layer}_sentence_{sentence_idx + 1}": wandb.Html(html_content)})
+            # except:
+            #     print("Skipped wandb logging.")
+            #
+            # fine_vis = cv.attention.attention_patterns(
+            #     tokens=fine_str_tokens,
+            #     attention=fine_patterns[layer],
+            # )
+            # fine_html_path = f"finetuned_attention_layer_{layer}_sentence_{sentence_idx + 1}.html"
+            # with open(fine_html_path, "w") as f:
+            #     f.write(str(fine_vis))
+            # print(f"Finetuned attention pattern saved as: {fine_html_path}")
+            # html_content = str(fine_vis)
 
-            try:
-                wandb.log({f"pretrained_layer_{layer}_sentence_{sentence_idx + 1}": wandb.Html(html_content)})
-            except:
-                print("Skipped wandb logging.")
-
-            fine_vis = cv.attention.attention_patterns(
-                tokens=fine_str_tokens,
-                attention=fine_patterns[layer],
-            )
-            fine_html_path = f"finetuned_attention_layer_{layer}_sentence_{sentence_idx + 1}.html"
-            with open(fine_html_path, "w") as f:
-                f.write(str(fine_vis))
-            print(f"Finetuned attention pattern saved as: {fine_html_path}")
-            html_content = str(fine_vis)
-
-            try:
-                wandb.log({f"finetuned_layer_{layer}_sentence_{sentence_idx + 1}": wandb.Html(str(html_content))})
-            except:
-                print("Skipped wandb logging.")
+            # try:
+            #     wandb.log({f"finetuned_layer_{layer}_sentence_{sentence_idx + 1}": wandb.Html(str(html_content))})
+            # except:
+            #     print("Skipped wandb logging.")
 
 
 # Main function
@@ -201,7 +225,7 @@ def main():
     test_data = load_dataset('yelp_polarity')['test'].select(range(5))
     test_data = test_data['text']
 
-    test_data = ['I love this restaurant!', 'The food was terrible.', 'Service was okay, but the food was great!', 'I will never come back here again.', 'This place is amazing!']
+    test_data = ['why does my life suck?', 'hope you have a good flight', 'oh no! Poor thing keep us posted.', 'Hello May you have a great day', 'that sounds foreboding...']
 
     enhanced_comparison(pretrained_model, finetuned_model, test_data)
 
