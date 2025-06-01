@@ -11,10 +11,10 @@ from tqdm import tqdm
 
 TRAIN_DATA_PATH = 'frfede/twitter-sentiment'
 MODEL_SAVE_PATH = "../transformerlens_twitter_model"
-BATCH_SIZE = 2
-NUM_EPOCHS = 3
-LEARNING_RATE = 5e-5
-MAX_LENGTH = 100
+BATCH_SIZE =40
+NUM_EPOCHS = 50
+LEARNING_RATE = 6e-4
+MAX_LENGTH = 30
 
 def data_prepare(dataset):
     def clean_dataset(dataset):
@@ -38,7 +38,7 @@ def data_prepare(dataset):
 
     def count_filter_short_sentences(df, max_length=7, text_col="text"):
         short_sentences = df[df[text_col].str.split().str.len() <= max_length]
-        print(short_sentences.head(20))
+        #print(short_sentences.head(20))
         count = len(short_sentences)
         print(f"Number of sentences with length ≤ {max_length}: {count}")
         return short_sentences
@@ -54,7 +54,7 @@ def data_prepare(dataset):
         # Split dataset into training and test sets
         train_df = df.sample(frac=0.8, random_state=42)
         test_df = df.drop(train_df.index)
-        test_df.to_csv(r"D:\fine-tuning-project-local\sentiment_classification\data\twitter_test.csv", index=False, encoding="utf-8")
+        test_df.to_csv("/home/ubuntu/fine-tuning-project/sentiment_classification/src/twitter_test.csv", index=False, encoding="utf-8")
         return train_df, test_df
 
     dataset = clean_dataset(dataset)
@@ -64,7 +64,7 @@ def data_prepare(dataset):
     train_df, test_df = data_split(df)
     count_classs_distribution(train_df)
     count_classs_distribution(test_df)
-    return train_df[:30].to_dict("records")
+    return train_df.to_dict("records")
 
 def make_prompt_and_target(text, label):
     return f"Review: {text}\nSentiment:", f"{label}"
@@ -78,7 +78,6 @@ class SentimentDataset(Dataset):
             full = prompt
             input_ids = tokenizer(full, padding="max_length", truncation=True, max_length=MAX_LENGTH, return_tensors="pt")["input_ids"][0]
             prompt_ids = tokenizer(str(sample["label"]), padding="max_length", truncation=True, max_length=MAX_LENGTH, return_tensors="pt")["input_ids"][0]
-            loss_mask = (prompt_ids == tokenizer.pad_token_id).long()
             self.data.append((input_ids, prompt_ids))
             self.labels.append(sample["label"])
 
@@ -118,24 +117,24 @@ def train_and_save_model(data_dic, train_data_path, save_path):
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     print("Starting training...")
-    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=0.01, betas=(0.9, 0.95))
     scaler = torch.cuda.amp.GradScaler()
 
     for epoch in range(NUM_EPOCHS):
         total_loss = 0
-        for input_ids, loss_mask in tqdm(dataloader, desc=f"Epoch {epoch+1}", leave=False):
-            input_ids, loss_mask = input_ids.to(device), loss_mask.to(device)
+        for input_ids, labels in tqdm(dataloader, desc=f"Epoch {epoch+1}", leave=False):
+            input_ids, labels = input_ids.to(device), labels.to(device)
             with torch.cuda.amp.autocast():
                 logits = model(input_ids)
-                shift_logits = logits
-                shift_labels = loss_mask
-                loss_fct = torch.nn.CrossEntropyLoss(reduction="none")
-                loss = loss_fct(shift_logits.reshape(-1, shift_logits.size(-1)), shift_labels.reshape(-1))
-                masked_loss = loss
-                final_loss = masked_loss.sum()
+                loss_fct = torch.nn.CrossEntropyLoss(reduction="none",ignore_index=tokenizer.pad_token_id)
+                loss = loss_fct(logits.reshape(-1, logits.size(-1)), labels.reshape(-1))
+                final_loss = loss.sum()
 
             optimizer.zero_grad()
+            
             scaler.scale(final_loss).backward()
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             scaler.step(optimizer)
             scaler.update()
             total_loss += final_loss.item()

@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 from transformers import GPT2Tokenizer
 from transformer_lens import HookedTransformer, HookedTransformerConfig
 # -------- Configurable Parameters --------
-BATCH_SIZE = 20
+BATCH_SIZE = 2
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 # -------- Model and Tokenizer Setup --------
@@ -26,7 +26,6 @@ class SentimentDataset(Dataset):
             prompt, target = make_prompt_and_target(dataset[i]["text"], label)
             full = prompt 
             input_ids = tokenizer(full, padding="max_length", truncation=True, max_length=30, return_tensors="pt")["input_ids"][0]
-            print(target)
             prompt_ids = tokenizer(target, padding="max_length", truncation=True, max_length=1, return_tensors="pt")["input_ids"][0]
             loss_mask = (prompt_ids == tokenizer.pad_token_id).long()
             self.data.append((input_ids, prompt_ids))
@@ -64,23 +63,28 @@ def evaluate_accuracy(model, dataset):
             #print(input_ids)
             logits = model(input_ids)
             #print(logits)
-            predictions = torch.argmax(logits, dim=-1)[:, -1]  # last token
-            prediction_val, predictions_indices=torch.topk(logits,dim=-1, k=1)
-            #print(predictions_indices[0][0])
-            predicted=[]
-            predicted.append(predictions_indices[0][0])
-            predicted.append(predictions_indices[1][0])
-            print(predicted)
+            logits = logits[:, 0,:]
+            probs = torch.softmax(logits,dim=-1)
+            #print(torch.argmax(probs[0]))
+            # sample from the distribution
+            idx_next = torch.multinomial(probs, num_samples=1)
+            #print("id ",idx_next)
+            text = tokenizer.decode(idx_next[0])
             true_labels = labels.tolist()
-            for i in range(len(predicted)):
-                if predicted[i][0] == true_labels[i][0]:
+            #print("true ",true_labels)
+
+            _, ii= torch.topk(probs[0], k=1, dim=-1)
+            print(ii)
+            try:
+                _, ii= torch.topk(probs[1], k=1, dim=-1)
+                print(ii)
+            except:
+                c=0
+            for i in range(len(true_labels)):
+                if idx_next[i][0]== true_labels[i][0]:
                     correct+=1
-            text = tokenizer.decode(predictions_indices[0][0][0])
-            print("text ",text)
-            
-            true_labels = labels.tolist()
-            print(true_labels)
-            total += len(labels)
+            total += len(true_labels)
+
     return correct / total if total > 0 else 0
 
 # -------- Evaluation Modes --------
@@ -92,7 +96,7 @@ def eval_pretrained_on_test(test_path):
 
 def eval_finetuned_on_test(model_path, test_path):
     raw_data = pd.read_csv(test_path).to_dict("records")
-    raw_data=load_dataset('yelp_polarity')['train'].select(range(10))
+    #raw_data=load_dataset('yelp_polarity')['train'].select(range(10))
     
     test_dataset = SentimentDataset(raw_data)
     model = load_model(model_path)
@@ -102,9 +106,9 @@ def eval_transfer(finetuned_model_path, new_test_path):
     return eval_finetuned_on_test(finetuned_model_path, new_test_path)
 
 if __name__ == "__main__":
-    model_path = "yelp_model/"
+    model_path = "/home/ubuntu/fine-tuning-project/sentiment_classification/transformerlens_twitter_model/"
     test_path_1 = "/home/ubuntu/fine-tuning-project/sentiment_classification/data/train_5.csv"
-    test_path_2 = "/home/ubuntu/fine-tuning-project/sentiment_classification/data/yelp_train.csv" #Or can load from huggingface dataset, simply edit all the test functions
+    test_path_2 = "/home/ubuntu/fine-tuning-project/sentiment_classification/src/twitter_test.csv" #Or can load from huggingface dataset, simply edit all the test functions
 
     #acc_pre = eval_pretrained_on_test(test_path_1)
     #print(f"Accuracy (Pretrained GPT2): {acc_pre:.4f}")

@@ -9,9 +9,9 @@ import pandas as pd
 # ---------------- Config ----------------
 TRAIN_DATA_PATH = "yelp_polarity" # Or "stanfordnlp/imdb".Load from huggingface
 MODEL_SAVE_PATH = "../transformerlens_yelp_model"
-BATCH_SIZE = 2
+BATCH_SIZE = 20
 NUM_EPOCHS = 3
-LEARNING_RATE = 5e-5
+LEARNING_RATE = 5e-4
 MAX_LENGTH = 100
 NUM_SAMPLE=1000
 # ---------------- Utils ----------------
