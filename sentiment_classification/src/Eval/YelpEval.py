@@ -61,22 +61,17 @@ def evaluate_accuracy(model, dataset):
     with torch.no_grad():
         for input_ids, labels in loader:
             input_ids = input_ids.to(DEVICE)
-            #print(input_ids)
             logits = model(input_ids)
-            #print(logits)
             predictions = torch.argmax(logits, dim=-1)[:, -1]  # last token
             prediction_val, predictions_indices=torch.topk(logits,dim=-1, k=1)
-            #print(predictions_indices[0][0])
             predicted=[]
             predicted.append(predictions_indices[0][0])
             predicted.append(predictions_indices[1][0])
-            print(predicted)
             true_labels = labels.tolist()
             for i in range(len(predicted)):
                 if predicted[i][0] == true_labels[i][0]:
                     correct+=1
             text = tokenizer.decode(predictions_indices[0][0][0])
-            print("text ",text)
             
             true_labels = labels.tolist()
             print(true_labels)
@@ -114,7 +109,3 @@ if __name__ == "__main__":
     #
     #acc_transfer = eval_transfer(model_path, test_path_2)
     #print(f"Transfer Accuracy (Finetuned on Set1, Tested on Set2): {acc_transfer:.4f}")
-    raw_data = load_dataset('yelp_polarity')['train'].select(range(5))
-    for i in range(5):
-        print(raw_data[i]["label"])
-    raw_data = raw_data.to_pandas().to_dict("records")
