@@ -22,8 +22,8 @@ device1 = model.cfg.device
 
 from transformers import GPT2Tokenizer
 
-def make_prompt_and_target(text, label,answer):
-    return f"Answer the question from the Given context. Context:{text}. Question:{label}. Answer:{answer} "
+def make_prompt_and_target(text, question,answer):
+    return f"Answer the question from the Given context. Context:{text}. Question:{question}. Answer:{answer} "
 MAX_LENGTH=512
 
 class SentimentDataset(Dataset):

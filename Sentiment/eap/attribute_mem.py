@@ -55,7 +55,7 @@ def get_npos_input_lengths(model, inputs):
     return n_pos, input_lengths
 
 def make_hooks_and_matrices(model: HookedTransformer, graph: Graph, batch_size:int , n_pos:int, scores):
-    activation_difference = torch.zeros((batch_size, n_pos, graph.n_forward, model.cfg.d_model), device='cpu', dtype=model.cfg.dtype)
+    activation_difference = torch.zeros((batch_size, n_pos, graph.n_forward, model.cfg.d_model), device=model.cfg.device, dtype=model.cfg.dtype)
 
     processed_attn_layers = set()
     fwd_hooks_clean = []
@@ -110,7 +110,7 @@ def make_hooks_and_matrices(model: HookedTransformer, graph: Graph, batch_size:i
     return (fwd_hooks_corrupted, fwd_hooks_clean, bwd_hooks), activation_difference
 
 def get_scores(model: HookedTransformer, graph: Graph, dataset, metric: Callable[[Tensor], Tensor]):
-    scores = torch.zeros((graph.n_forward, graph.n_backward), device='cpu', dtype=model.cfg.dtype)    
+    scores = torch.zeros((graph.n_forward, graph.n_backward), device=model.cfg.device, dtype=model.cfg.dtype)
     
     total_items = 0
     for clean, corrupted, label in tqdm(dataset):
@@ -140,7 +140,7 @@ def get_scores(model: HookedTransformer, graph: Graph, dataset, metric: Callable
     return scores
 
 def get_scores_ig(model: HookedTransformer, graph: Graph, dataset, metric: Callable[[Tensor], Tensor], steps=30):
-    scores = torch.zeros((graph.n_forward, graph.n_backward), device='cpu', dtype=model.cfg.dtype)    
+    scores = torch.zeros((graph.n_forward, graph.n_backward), device=model.cfg.device, dtype=model.cfg.dtype)
     
     total_items = 0
     for clean, corrupted, label in tqdm(dataset):

@@ -32,7 +32,7 @@ class SentimentDataset(Dataset):
 
 
 
-raw_data = load_dataset('kde4',lang1="en", lang2="fr")['train'].select(range(10))
+raw_data = load_dataset('kde4',lang1="en", lang2="fr")['train'].select(range(1000,2000))
 
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 tokenizer.pad_token = tokenizer.eos_token
@@ -41,7 +41,7 @@ test_dataset = SentimentDataset(raw_data,tokenizer)
 model1 = HookedTransformer.from_pretrained("gpt2-small")
 cg=model1.cfg.to_dict()
 model = HookedTransformer(cg)
-model.load_state_dict(torch.load("model_1000.pt"))
+model.load_state_dict(torch.load(r"D:\fine-tuning-project-local\MT\Models\TATOEBA_en_fr.pt", map_location=model.cfg.device))
 model.to(model.cfg.device)
 
 
@@ -52,9 +52,9 @@ from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 
 smoothing = SmoothingFunction().method1  # To avoid 0 scores on short sentences
 
-
+sample_number = 1000
 sum_score=0
-for i in range(10):
+for i in range(sample_number):
     prompt, label =test_dataset[i]
     #print("Prompt: ",prompt)
     print("Label: ",label)
@@ -69,5 +69,5 @@ for i in range(10):
 
 weights = (1, 0.75, 0, 0)
 print( sentence_bleu(["The cat is on the mat"], "The cat is on the mat", smoothing_function=smoothing))
-sum_score=sum_score/10
+sum_score=sum_score/sample_number
 print(f"BLEU score: {sum_score:.4f}")

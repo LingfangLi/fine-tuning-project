@@ -35,20 +35,33 @@ TASK_CONFIG = {
     },
     "machine_translation": {
         "pretrained_model": "gpt2-small",
-        "finetuned_path": "../machine_translation_kde4_model",
-        "is_hf_checkpoint": True,  # Flag to indicate HuggingFace checkpoint
-        "dataset_name": "sethjsa/wmt_en_fr_parallel",
-        #"dataset_config": "en-fr",  # Source and target languages
+        "finetuned_path": r"D:\fine-tuning-project-local\MT\Models\KDE4_en_fr.pt", #r'D:\fine-tuning-project-local\sentiment_classification\machine_translation_kde4_model',
+        "is_hf_checkpoint": False,  # Flag to indicate HuggingFace checkpoint
+        "dataset_name": 'kde4' , #"sethjsa/wmt_en_fr_parallel"
+        "dataset_config": "en-fr",  # Source and target languages
         "dataset_split": "train",
         "num_samples": 5,
-        "input_formatter": lambda sample: f"English: {sample['en']}\nFrench: {sample['fr'][:50]}",
+        "test_index_start": 30001,  # Start index for test samples
+        "input_formatter": lambda sample: f"ETranslate Enlish to French. English: {sample['en']}\nFrench: {sample['fr']}",
         # Partial French for prompting
-        "sample_processor": lambda data: [{"en": s["en"], "fr": s["fr"]} for s in data]
+        "sample_processor": lambda data: [{"en": s["translation"]["en"], "fr": s["translation"]["fr"]} for s in data]
+    },
+"machine_translation_tatoeba": {
+        "pretrained_model": "gpt2-small",
+        "finetuned_path": r"D:\fine-tuning-project-local\MT\Models\TATOEBA_en_fr.pt",
+        "dataset_name": 'tatoeba' , #"sethjsa/wmt_en_fr_parallel"
+        "dataset_config": "en-fr",  # Source and target languages
+        "dataset_split": "train",
+        "num_samples": 5,
+        "test_index_start": 40001,  # Start index for test samples
+        "input_formatter": lambda sample: f"Translate Enlish to French. English: {sample['en']}\nFrench: {sample['fr']}",
+        # Partial French for prompting
+        "sample_processor": lambda data: [{"en": s["translation"]["en"], "fr": s["translation"]["fr"]} for s in data]
     }
 }
 
 # Select Task
-CURRENT_TASK = "machine_translation"  # Change this to switch tasks
+CURRENT_TASK = "machine_translation_tatoeba"  # Change this to switch tasks
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 THRESHOLD_PERCENT = 60.0
 TASK = "question answering"  # or "sentiment"
@@ -95,8 +108,15 @@ def load_models(config, device):
     pretrained_model.cfg.use_attn_result = True
     pretrained_model.cfg.use_hook_mlp_in = True
 
+    # 如果fine-tuning 模型以pt文件形式存在
+    if os.path.exists(config["finetuned_path"]) and config["finetuned_path"].endswith(".pt"):
+        model_path = config["finetuned_path"]
+        cfg = pretrained_model.cfg.to_dict()
+        finetuned_model = HookedTransformer(cfg)
+        finetuned_model.load_state_dict(torch.load(model_path, map_location=device))
+        finetuned_model.to(finetuned_model.cfg.device)
     # Load finetuned model
-    if config.get("is_hf_checkpoint", False):
+    elif config.get("is_hf_checkpoint", False):
         print(f"Loading HuggingFace checkpoint from {config['finetuned_path']}")
 
         # Load HuggingFace model
@@ -142,6 +162,7 @@ def load_models(config, device):
         # Original loading method for TransformerLens checkpoints
         config_path = os.path.join(config["finetuned_path"], "config.json")
         model_path = os.path.join(config["finetuned_path"], "model_state_dict.pth")
+
 
         if not os.path.exists(config_path) or not os.path.exists(model_path):
             raise FileNotFoundError(f"Model files not found in {config['finetuned_path']}")
@@ -295,7 +316,6 @@ def enhanced_comparison(pre_model, fine_model, test_data, config):
     all_reports = []
     all_pre_reports = []
     all_fine_reports = []
-    keywords = config["keywords_to_track"]
 
     for idx, sample in enumerate(test_data):
         print(f"\n=== Processing Test Sample {idx + 1} ===")
@@ -320,7 +340,7 @@ def enhanced_comparison(pre_model, fine_model, test_data, config):
 
     print("\n=== Average ratio of Significant Changes in Attention Patterns Across Layers and Heads ===")
     print(avg_change_table.to_string(index=False))
-    avg_change_table.to_csv(f"attention_changes_{CURRENT_TASK}_{THRESHOLD_PERCENT}%.csv", index=False)
+    avg_change_table.to_csv(rf"D:\fine-tuning-project-local\attention_pattern_changes_table\attention_changes_{CURRENT_TASK}_{config['dataset_name']}_{THRESHOLD_PERCENT}%.csv", index=False)
 
     if ANALYZE_MODEL_SEPERATELY:
         print("\n=== Average Attention Patterns Across Layers and Heads in Pretrained Model ===")
@@ -353,9 +373,22 @@ def main():
         # Load KDE4 dataset
         dataset = load_dataset(
             config["dataset_name"],
-            split=f"{config['dataset_split']}[:{config['num_samples']}]"
+            config["dataset_config"],
+            split=f"{config['dataset_split']}",#
+            trust_remote_code=True
         )
-        test_data = config["sample_processor"](dataset)
+        print(len(dataset))
+        test_data = config["sample_processor"](dataset)[config["test_index_start"]:(config["test_index_start"]+config['num_samples'])]
+    elif CURRENT_TASK == "machine_translation_tatoeba":
+        # Load KDE4 dataset
+        dataset = load_dataset(
+            config["dataset_name"],
+            lang1="en", lang2="fr",
+            split=f"{config['dataset_split']}",  #
+            trust_remote_code=True
+        )
+        print(len(dataset))
+        test_data = config["sample_processor"](dataset)[config["test_index_start"]:(config["test_index_start"] + config['num_samples'])]
     elif config["dataset_name"]:
         dataset = load_dataset(
             config["dataset_name"],
@@ -366,7 +399,7 @@ def main():
         # For custom test data
         test_data = pd.read_csv(config['test_dataset_path'])[:config['num_samples']].to_dict(orient='records')
 
-    # Run comparison
+    # # Run comparison
     enhanced_comparison(
         pretrained_model,
         finetuned_model,
@@ -374,7 +407,7 @@ def main():
         config
     )
     print("\nAnalysis complete!")
-    print(f"Results saved to: attention_changes_{CURRENT_TASK}_{THRESHOLD_PERCENT}%.csv")
+    print(f"Results saved to: attention_changes_{CURRENT_TASK}_{config['dataset_name']}_{THRESHOLD_PERCENT}%.csv")
 
 if __name__ == "__main__":
     main()

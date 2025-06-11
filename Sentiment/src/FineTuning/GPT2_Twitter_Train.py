@@ -18,6 +18,8 @@ model.cfg.use_split_qkv_input = True
 model.cfg.use_attn_result = True
 model.cfg.use_hook_mlp_in = True
 
+model.load_state_dict(torch.load("/users/sglli24/fine-tuning-project/Twitter.pt"))
+
 raw_data = load_dataset('frfede/twitter-sentiment')['train'].select(range(50000))
 device1 = model.cfg.device
 

@@ -47,8 +47,6 @@ tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 tokenizer.pad_token = tokenizer.eos_token
 dataset = SentimentDataset(raw_data, tokenizer)
 
-dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
-
 #print(dataset.tokens)
 # Load tokenizer and prepare dataset
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")

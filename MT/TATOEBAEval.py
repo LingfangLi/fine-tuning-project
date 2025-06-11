@@ -32,18 +32,19 @@ class SentimentDataset(Dataset):
 
 
 
-raw_data = load_dataset('tatoeba',lang1="en", lang2="fr",trust_remote_code=True)['train'].select(range(40000))
+raw_data = load_dataset('tatoeba',lang1="en", lang2="fr",trust_remote_code=True)['train'].select(range(40000,50000))
 
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 tokenizer.pad_token = tokenizer.eos_token
 
 dataset = SentimentDataset(raw_data,tokenizer)
+# test_data = dataset
 test_data=dataset[(int)(len(dataset)*.90): len(dataset)]
 #test_data=dataset[0: 100]
 model1 = HookedTransformer.from_pretrained("gpt2-small")
 cg=model1.cfg.to_dict()
 model = HookedTransformer(cg)
-model.load_state_dict(torch.load("model_1500.pt"))
+model.load_state_dict(torch.load(r"D:\fine-tuning-project-local\Sentiment\src\models\Twitter.pt", map_location=model.cfg.device))
 model.to(model.cfg.device)
 
 
@@ -54,7 +55,7 @@ from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 smoothing = SmoothingFunction().method1  # To avoid 0 scores on short sentences
 
 sum_score=0
-for i in range(100):
+for i in range(1000):
     prompt=test_data[0][i]
     label=test_data[1][i]
     #print("Prompt: ",prompt)
@@ -70,5 +71,5 @@ for i in range(100):
 
 weights = (1, 0.75, 0, 0)
 print( sentence_bleu(["The cat is on the mat"], "The cat is on the mat", smoothing_function=smoothing))
-sum_score=sum_score/100
+sum_score=sum_score/1000
 print(f"BLEU score: {sum_score:.4f}")
