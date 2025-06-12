@@ -30,7 +30,7 @@ def make_prompt_and_target(story, question, answer):
     """
     Create prompt for a single Q&A pair.
     """
-    prompt = f"Answer the question from the given context. Context: {story} Question: {question} Answer: {answer['input_text']}"
+    prompt = f"Answer the question from the given context. Context: {story} Question: {question} Answer: {answer}"
     return prompt
 
 
@@ -46,7 +46,7 @@ class CoQADataset(Dataset):
         for sample in tqdm(dataset, desc="Processing CoQA samples"):
             story = sample["story"]
             questions = sample["questions"]
-            answers = sample["answers"]
+            answers = sample["answers"]['input_text']
 
             # Process each Q&A pair
             for idx in range(len(questions)):
