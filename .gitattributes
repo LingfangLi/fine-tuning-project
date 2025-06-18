@@ -1,0 +1,2 @@
+D:/fine-tuning-project-local/MT/Models/E4_model_1500.pt filter=lfs diff=lfs merge=lfs -text
+*.pt filter=lfs diff=lfs merge=lfs -text
