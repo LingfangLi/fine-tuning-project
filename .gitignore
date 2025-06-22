@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+# venv/
+# .venv/
+# env/
+# .env/
+
+# IDE specific files
+sentiment_classification/.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Large data files
+#/*train.csv
+# data/imdb_train_5.csv
+
+# Saved models
+transformerlens_movie_review_model/
+transformerlens_yelp_model/
+
+# Log files
+#*.log
