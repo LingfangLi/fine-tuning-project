@@ -1,3 +1,0 @@
-Yelp_v1.pt filter=lfs diff=lfs merge=lfs -text
-Twitter.pt filter=lfs diff=lfs merge=lfs -text
-*.pt filter=lfs diff=lfs merge=lfs -text

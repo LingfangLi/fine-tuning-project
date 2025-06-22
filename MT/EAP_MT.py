@@ -7,6 +7,8 @@ import plotly.express as px
 from typing import List, Union, Optional, Tuple, Literal
 from functools import partial
 from IPython.display import Image, display
+from torch.utils.data import DataLoader, Dataset
+from datasets import load_dataset
 
 import transformer_lens.utils as utils
 from transformer_lens.hook_points import (
@@ -36,7 +38,7 @@ def setup_model(model_path: str):
     return model
 
 
-def prob_diff(logits: torch.Tensor, corrupted_logits, input_lengths, labels: torch.Tensor, loss=False, mean=False):
+def prob_diff(model: HookedTransformer,logits: torch.Tensor, corrupted_logits, input_lengths, labels: torch.Tensor, loss=False, mean=False):
     """
     the probability difference metric, which takes in logits and labels (years), and
     returns the difference in prob. assigned to valid (> year) and invalid (<= year) tokens
@@ -49,9 +51,12 @@ def prob_diff(logits: torch.Tensor, corrupted_logits, input_lengths, labels: tor
     probs, next_tokens = torch.topk(probs[-1], 5)
     prob_a = 0
     prob_b = 0
+    print("Next ", next_tokens)
     for prob, token, label in zip(probs, next_tokens, labels):
-        if token == label:
-            prob_b = prob
+        print(token)
+        token_str=model.tokenizer.decode(token.item())
+        if token_str in  label:
+            prob_b = prob_b+prob
         else:
             prob_a = prob_a + prob
 
@@ -66,7 +71,8 @@ def batch_dataset(df, batch_size=2):
     clean, corrupted, label = [df[col].tolist() for col in ['clean', 'corrupted', 'label']]
     clean = [clean[i:i + batch_size] for i in range(0, len(df), batch_size)]
     corrupted = [corrupted[i:i + batch_size] for i in range(0, len(df), batch_size)]
-    label = [torch.tensor(label[i:i + batch_size]) for i in range(0, len(df), batch_size)]
+    #tokenizer(label[0], padding="max_length", truncation=True, max_length=MAX_LENGTH, return_tensors="pt")["input_ids"][0]
+    label = [label[i:i + batch_size] for i in range(0, len(df), batch_size)]
     return [(clean[i], corrupted[i], label[i]) for i in range(len(clean))]
 
 def validate_dataset_tokenization(model, dataset):
@@ -149,8 +155,9 @@ def compute_edge_overlap(edges1: dict, edges2: dict):
     }
 
 def main():
+    raw_data = load_dataset('kde4',lang1="en", lang2="fr")['train'].select(range(30000))
     try:
-        df1 = pd.read_csv('./a.csv')
+        df1 = pd.read_csv('a.csv',sep=',')
         print(f"Loaded dataset with {len(df1)} samples")
     except FileNotFoundError:
         print("Error: './a.csv' not found!")
@@ -162,18 +169,18 @@ def main():
 
     # Load models
     try:
-        model1 = setup_model("/content/drive/MyDrive/fine-tuning-project-local/sentiment/model/Twitter_Best.pt")
+        model1 = setup_model("Models/KDE4_en_fr.pt")
         print(f"Model 1 loaded on {model1.cfg.device}")
     except FileNotFoundError:
         print("Error: '../model/Twitter_Best.pt' not found!")
         return
 
-    try:
-        model2 = setup_model("/content/drive/MyDrive/fine-tuning-project-local/sentiment/model/Yelp_v1.pt")
-        print(f"Model 2 loaded on {model2.cfg.device}")
-    except FileNotFoundError:
-        print("Error: '../models/Yelp_v1.pt' not found!")
-        return
+    #try:
+        #model2 = setup_model("/content/drive/MyDrive/fine-tuning-project-local/sentiment/model/Yelp_v1.pt")
+        #print(f"Model 2 loaded on {model2.cfg.device}")
+    #except FileNotFoundError:
+        #print("Error: '../models/Yelp_v1.pt' not found!")
+        #return
 
     # Define metric
     metric = prob_diff
@@ -181,16 +188,18 @@ def main():
     # Get important edges for both models
     print("Analyzing Model 1...")
     g1, edges1 = get_important_edges(model1, dataset1, metric, top_k=400)
+    print(edges1)
     print("\nAnalyzing Model 2...")
-    g2, edges2 = get_important_edges(model2, dataset1, metric, top_k=400)
+
+    #g2, edges2 = get_important_edges(model2, dataset1, metric, top_k=400)
 
     # Compute overlap
-    overlap_results = compute_edge_overlap(edges1, edges2)
-    print(f"Common edges: {overlap_results['overlap_count']}")
+    #overlap_results = compute_edge_overlap(edges1, edges2)
+    #print(f"Common edges: {overlap_results['overlap_count']}")
     # Save detailed results
-    pd.DataFrame(overlap_results['common_edges']).to_csv('./common_edges.csv', index=False)
+    #pd.DataFrame(overlap_results['common_edges']).to_csv('./common_edges.csv', index=False)
 
-    return g1, g2, overlap_results
+    return g1
 
 
 if __name__ == "__main__":
