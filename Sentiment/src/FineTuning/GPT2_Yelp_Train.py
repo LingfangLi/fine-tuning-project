@@ -19,6 +19,11 @@ model.cfg.use_attn_result = True
 model.cfg.use_hook_mlp_in = True
 
 raw_data = load_dataset('yelp_polarity')['train'].select(range(100000))
+# calculate the average length of the raw_data
+# print the average length of the raw_data
+#print(raw_data[0]['text'],len(raw_data[0]['text'].split()))
+#print("Average length of the raw_data:", sum(len(sample['text'].split()) for sample in raw_data) / len(raw_data))
+
 device1 = model.cfg.device
 
 from transformers import GPT2Tokenizer

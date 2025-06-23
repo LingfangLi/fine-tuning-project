@@ -10,18 +10,18 @@ from transformer_lens import HookedTransformer, HookedTransformerConfig
 from transformer_lens.train import HookedTransformerTrainConfig, train
 from tqdm import tqdm
 
-
-
 model = HookedTransformer.from_pretrained("gpt2-small", device="cuda:0" if torch.cuda.is_available() else "cpu")
 model.cfg.use_attn_in = True
 model.cfg.use_split_qkv_input = True
 model.cfg.use_attn_result = True
 model.cfg.use_hook_mlp_in = True
 
-model.load_state_dict(torch.load("/users/sglli24/fine-tuning-project/Twitter.pt"))
-
 raw_data = load_dataset('frfede/twitter-sentiment')['train'].select(range(50000))
 device1 = model.cfg.device
+
+# raw_data = raw_data[0:(int)(len(raw_data)*0.90)]  # Use 90% of the data for training
+# print(raw_data['text'][0],len(raw_data['text'][0].split()))
+# print("Average length of the raw_data:", sum(len(sample.split()) for sample in raw_data['text']) / len(raw_data['text']))
 
 from transformers import GPT2Tokenizer
 
@@ -51,8 +51,10 @@ tokenizer.pad_token = tokenizer.eos_token
 dataset = SentimentDataset(raw_data, tokenizer)
 train_dataset=dataset[0:(int)(0.90*len(dataset))]
 
-#print(dataset.tokens)
-# Load tokenizer and prepare dataset
+
+
+print(dataset.tokens)
+#Load tokenizer and prepare dataset
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 tokenizer.pad_token = tokenizer.eos_token
 

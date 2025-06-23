@@ -9,6 +9,7 @@ from transformers import GPT2Tokenizer
 from transformer_lens import HookedTransformer, HookedTransformerConfig
 from transformer_lens.train import HookedTransformerTrainConfig, train
 from tqdm import tqdm
+import random
 
 # Initialize model
 model = HookedTransformer.from_pretrained("gpt2-small", device="cuda" if torch.cuda.is_available() else "cpu")
@@ -19,6 +20,7 @@ model.cfg.use_hook_mlp_in = True
 
 # Load CoQA dataset
 raw_data = load_dataset('stanfordnlp/coqa')['train']
+#print(raw_data[0])
 device1 = model.cfg.device
 
 # Load tokenizer
@@ -30,7 +32,7 @@ def make_prompt_and_target(story, question, answer):
     """
     Create prompt for a single Q&A pair.
     """
-    prompt = f"Answer the question from the given context. Context: {story} Question: {question} Answer: {answer['input_text']}"
+    prompt = f"Answer the question from the given context. Context: {story} Question: {question} Answer: {answer}"
     return prompt
 
 
@@ -46,7 +48,7 @@ class CoQADataset(Dataset):
         for sample in tqdm(dataset, desc="Processing CoQA samples"):
             story = sample["story"]
             questions = sample["questions"]
-            answers = sample["answers"]
+            answers = sample["answers"]['input_text']
 
             # Process each Q&A pair
             for idx in range(len(questions)):
@@ -87,19 +89,20 @@ dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
 # Training configuration
 cfg = HookedTransformerTrainConfig(
-    num_epochs=10,
-    batch_size=20,
+    num_epochs=5,        # 增加epoch数
+    batch_size=15,        # 减小batch size
     save_every=500,
-    warmup_steps=2000,
+    warmup_steps=2000,    # 大幅减少warmup
     max_grad_norm=1.0,
     lr=0.001,
-    seed=0,
+    seed=42,
     momentum=0.0,
     weight_decay=0.01,
     optimizer_name='AdamW',
     device=device1,
-    save_dir="/home/ubuntu/"
+    save_dir=r"/users/sglli24/fine-tuning-project/QA/Models"
 )
+
 
 # Train the model
 print("Starting training...")

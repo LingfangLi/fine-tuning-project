@@ -9,34 +9,34 @@ from transformer_lens import HookedTransformer, HookedTransformerConfig
 MAX_LENGTH=148
 
 def make_prompt_and_target(text, label):
-    return f"Review: {text}\nSentiment: {label}"
-
-
+    return f"Review: {text}\nSentiment: ",label
 
 class SentimentDataset(Dataset):
-    def __init__(self, dataset, tokenizer):
+    def __init__(self, dataset):
         self.tokens = []
+        self.labels = []
         for sample in dataset:
-            prompt= make_prompt_and_target(sample["text"], sample["label"])
-            input_ids = tokenizer(prompt, padding="max_length", truncation=True, max_length=MAX_LENGTH, return_tensors="pt")["input_ids"][0]
-            self.tokens.append({"tokens":input_ids})
+            prompt,label = make_prompt_and_target(sample["text"], sample["label"])
+            self.tokens.append(prompt)
+            self.labels.append(sample["label"])
 
     def __len__(self):
         return len(self.tokens)
 
     def __getitem__(self, idx):
-        return self.tokens[idx]
+        return self.tokens[idx],self.labels[idx]
 
 raw_data = load_dataset('yelp_polarity')['test'].select(range(1000))
 
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 tokenizer.pad_token = tokenizer.eos_token
-test_dataset = SentimentDataset(raw_data, tokenizer)
+test_dataset = SentimentDataset(raw_data)
+#print(test_dataset[0])
 
 model1 = HookedTransformer.from_pretrained("gpt2-small")
 cg=model1.cfg.to_dict()
 model = HookedTransformer(cg)
-model.load_state_dict(torch.load(r"D:\fine-tuning-project-local\Sentiment\src\models\Yelp_v1.pt", map_location=model.cfg.device))
+model.load_state_dict(torch.load(r"D:\fine-tuning-project-local\QA\Models\COQA_v1.pt", map_location=model.cfg.device))
 model.to(model.cfg.device)
 
 count=0

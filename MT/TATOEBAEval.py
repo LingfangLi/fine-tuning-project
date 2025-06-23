@@ -44,7 +44,7 @@ test_data=dataset[(int)(len(dataset)*.90): len(dataset)]
 model1 = HookedTransformer.from_pretrained("gpt2-small")
 cg=model1.cfg.to_dict()
 model = HookedTransformer(cg)
-model.load_state_dict(torch.load(r"D:\fine-tuning-project-local\Sentiment\src\models\Twitter.pt", map_location=model.cfg.device))
+model.load_state_dict(torch.load(r"D:\fine-tuning-project-local\QA\Models\COQA_v1.pt", map_location=model.cfg.device))
 model.to(model.cfg.device)
 
 

@@ -19,7 +19,7 @@ model.cfg.use_split_qkv_input = True
 model.cfg.use_attn_result = True
 model.cfg.use_hook_mlp_in = True
 
-raw_data = load_dataset('kde4',lang1="en", lang2="fr")['train'].select(range(30000))
+raw_data = load_dataset('',lang1="en", lang2="fr")['train'].select(range(30000))
 device1 = model.cfg.device
 
 from transformers import GPT2Tokenizer

@@ -7,15 +7,10 @@ from transformers import GPT2Tokenizer
 from transformer_lens import HookedTransformer, HookedTransformerConfig
 import pandas as pd
 
-
-
 MAX_LENGTH=148
-
 
 def make_prompt_and_target(text, label):
     return f"Review: {text}\nSentiment:",label
-
-
 
 class SentimentDataset(Dataset):
     def __init__(self, dataset, tokenizer):
@@ -45,10 +40,12 @@ tokenizer.pad_token = tokenizer.eos_token
 test_dataset = SentimentDataset(raw_data,tokenizer)
 test_dataset=test_dataset[(int)(0.90*len(test_dataset)):len(test_dataset)]
 
+print(test_dataset[0])
 model1 = HookedTransformer.from_pretrained("gpt2-small")
 cg=model1.cfg.to_dict()
 model = HookedTransformer(cg)
-model.load_state_dict(torch.load(r"D:\fine-tuning-project-local\Sentiment\src\models\Twitter.pt", map_location=model.cfg.device))
+#model.load_state_dict(torch.load(r"D:\fine-tuning-project-local\Sentiment\src\models\Twitter_Best.pt", map_location=model.cfg.device))
+model.load_state_dict(torch.load(r"D:\fine-tuning-project-local\QA\Models\COQA_v1.pt", map_location=model.cfg.device))
 model.to(model.cfg.device)
 
 

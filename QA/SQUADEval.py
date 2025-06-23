@@ -30,7 +30,7 @@ class SentimentDataset(Dataset):
         return self.tokens[idx], self.label[idx]
 
 
-raw_data = load_dataset('squad')['train'].select(range(40000))
+raw_data = load_dataset('squad')['validation'].select(range(10000))
 
 
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -42,7 +42,7 @@ dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 model1 = HookedTransformer.from_pretrained("gpt2-small", device="cuda" if torch.cuda.is_available() else "cpu")
 cg=model1.cfg.to_dict()
 model = HookedTransformer(cg)
-model.load_state_dict(torch.load("model_500.pt"))
+model.load_state_dict(torch.load(r"D:\fine-tuning-project-local\QA\Models\COQA_v1.pt", map_location=model.cfg.device))
 model.to(model.cfg.device)
 
 
@@ -56,23 +56,27 @@ smoothing = SmoothingFunction().method1  # To avoid 0 scores on short sentences
 
 sum_score=0
 correct=0
-for i in range(10):
-    prompt=test_dataset[0][i]
-    label=test_dataset[1][i]
-    print("Prompt: ",prompt)
-    print("Label: ",label)
-    weights = (0.25, 0.25, 0, 0)
-    x=model.generate(prompt,top_k=50,temperature=1)
-    x=x.replace(prompt,"")
-    print("Output ",x)
-    if x==label:
-        correct=correct+1
-    bleu_score = sentence_bleu([label.lower()], x.lower(), smoothing_function=smoothing)
-    print("Bleu Score", bleu_score)
-    sum_score=sum_score+bleu_score
+for i in range(1000):
+    try:
+        prompt=test_dataset[0][i]
+        label=test_dataset[1][i]
+        print("Prompt: ",prompt)
+        print("Label: ",label)
+        weights = (0.25, 0.25, 0, 0)
+        x=model.generate(prompt,top_k=50,temperature=1)
+        x=x.replace(prompt,"")
+        print("Output ",x)
+        if x==label:
+            correct=correct+1
+        bleu_score = sentence_bleu([label.lower()], x.lower(), smoothing_function=smoothing)
+        print("Bleu Score", bleu_score)
+        sum_score=sum_score+bleu_score
+    except Exception as e:
+        print(f"Error processing example {i}: {str(e)}")
+        continue
 
-print(correct)
 weights = (1, 0.75, 0, 0)
 print( sentence_bleu(["The cat is on the mat"], "The cat is on the mat", smoothing_function=smoothing))
-sum_score=sum_score/10
+sum_score=sum_score/1000
 print(f"BLEU score: {sum_score:.4f}")
+print(f"Correct: {correct} out of 1000, Accuracy: {correct/1000:.4f}")
