@@ -10,8 +10,12 @@ __pycache__/
 # .env/
 
 # IDE specific files
-sentiment_classification/.idea/
+sentiment_classification/
+Sentiment/src/EAPAnalysis/CommonEdges/
+Sentiment/src/MI/wandb/
+sentiment_fine_tune.py
 
+.idea/
 # OS generated files
 .DS_Store
 Thumbs.db
@@ -20,9 +24,9 @@ Thumbs.db
 #/*train.csv
 # data/imdb_train_5.csv
 
-# Saved models
-transformerlens_movie_review_model/
-transformerlens_yelp_model/
-
+*.pt
+*.csv
+*.out
+*.json
 # Log files
 #*.log
