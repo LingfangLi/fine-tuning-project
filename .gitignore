@@ -13,7 +13,11 @@ __pycache__/
 sentiment_classification/
 Sentiment/src/EAPAnalysis/CommonEdges/
 Sentiment/src/MI/wandb/
+Sentiment/src/ConruptedDataFind/
 sentiment_fine_tune.py
+Sentiment/src/CorruptedDataFind/search.py
+MT/Models/
+QA/Models/
 
 .idea/
 # OS generated files
