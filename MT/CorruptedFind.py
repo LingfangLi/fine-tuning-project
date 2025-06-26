@@ -127,7 +127,9 @@ if __name__ == "__main__":
     model.load_state_dict(
         torch.load(r"D:\fine-tuning-project-local\MT\Models\KDE4_en_fr.pt", map_location=model.cfg.device))
     model.to(model.cfg.device)
-    raw_data = load_dataset('kde4', lang1="en", lang2="fr")['train'].select(range(30000, 31000))
+    # raw_data = load_dataset('kde4', lang1="en", lang2="fr")['train'].select(range(30000, 31000))
+    raw_data = load_dataset('tatoeba', lang1="en", lang2="fr")['train'].select(range(40000, 41000))
+    
     source_sentences = [s['translation']['en'] for s in raw_data]
     target_sentences = [s['translation']['fr'] for s in raw_data]
     # Create and save corrupted data
