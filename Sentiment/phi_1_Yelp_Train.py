@@ -9,9 +9,6 @@ from transformers import GPT2Tokenizer
 from transformer_lens import HookedTransformer, HookedTransformerConfig 
 from transformer_lens.train import HookedTransformerTrainConfig, train
 from tqdm import tqdm
-from huggingface_hub import login
-
-login(token="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")
 
 
 model = HookedTransformer.from_pretrained("phi-1", device="cuda:0" if torch.cuda.is_available() else "cpu")
